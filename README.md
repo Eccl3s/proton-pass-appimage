@@ -79,7 +79,7 @@ head -c "$OFFSET" Proton_Pass-X-x86_64.AppImage > runtime
 dpkg-deb -x proton-pass_X_amd64.deb deb
 unsquashfs -o "$OFFSET" -d appimg Proton_Pass-X-x86_64.AppImage
 diff -r deb/usr/lib appimg/usr/lib
-diff -r deb/usr/share appimg/usr/share   # only difference: added metainfo/
+diff -r deb/usr/share appimg/usr/share   # only additions: metainfo/ and applications/io.github.eccl3s.ProtonPass.desktop
 
 # 3. Read the added files
 cat appimg/AppRun appimg/*.desktop appimg/usr/share/metainfo/*.xml

@@ -86,6 +86,7 @@ cp -a "$WORK/deb/usr/lib" "$APPDIR/usr/"
 cp -a "$WORK/deb/usr/share/." "$APPDIR/usr/share/"
 install -m 755 "$ROOT/appdir/AppRun" "$APPDIR/AppRun"
 cp "$WORK/deb/usr/share/applications/proton-pass.desktop" "$APPDIR/$APP_ID.desktop"
+cp "$WORK/deb/usr/share/applications/proton-pass.desktop" "$APPDIR/usr/share/applications/$APP_ID.desktop"
 # Upstream ships an SVG under a .png name
 cp "$WORK/deb/usr/share/pixmaps/proton-pass.png" "$APPDIR/proton-pass.svg"
 sed -e "s/@VERSION@/$VERSION/" -e "s/@DATE@/$REL_DATE/" \
