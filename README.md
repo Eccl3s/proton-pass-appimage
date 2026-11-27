@@ -1,7 +1,10 @@
 # Proton Pass AppImage
 
 Unofficial AppImage builds of [Proton Pass](https://proton.me/pass) for x86_64 Linux,
-repackaged unmodified from Proton's official `.deb`. Not affiliated with Proton AG.
+repackaged unmodified from Proton's official `.deb`.
+
+> **Unofficial.** This project is not affiliated with or endorsed by Proton AG.
+> "Proton" and "Proton Pass" are trademarks of Proton AG.
 
 A GitHub Actions workflow checks Proton's release feed every 6 hours and publishes a
 new [release](../../releases) when a new stable version appears.
@@ -48,7 +51,7 @@ AppImage or set `kernel.apparmor_restrict_unprivileged_userns=0`.
 5. Assembles an AppDir: Proton's `usr/lib` and `usr/share` copied unmodified, plus
    `AppRun`, a root desktop file, the icon and AppStream metadata
    (`appdir/io.github.eccl3s.ProtonPass.appdata.xml`).
-6. Runs appimagetool with `--runtime-file` (the verified runtime) and `-u` (update
+6. Runs appimagetool with `--runtime-file` (the verified runtime), `--comp zstd` and `-u` (update
    info), producing the AppImage, `.zsync` and `.sha256`.
 
 Pull requests run the build without publishing and attach the result as a workflow artifact.
@@ -64,24 +67,32 @@ sudo apt install curl jq gpg zsync appstream desktop-file-utils
 ## Verify a release
 
 Release notes list the upstream .deb SHA-512, the runtime SHA-256 and the AppImage SHA-256.
+
+### Build provenance
+
+Every release built while this repository is public carries a signed
+[build attestation](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations)
+proving it was produced by this repository's workflow from a specific commit:
+
+```bash
+gh attestation verify Proton_Pass-X-x86_64.AppImage --repo Eccl3s/proton-pass-appimage
+```
+
+### Contents
+
 To check the contents without running the AppImage:
 
 ```bash
 # Find where the squashfs starts (= size of the runtime ELF)
 OFFSET=$(python3 -c "import sys;d=open(sys.argv[1],'rb').read(64);import struct;sh_off=struct.unpack_from('<Q',d,0x28)[0];sh_sz,sh_n=struct.unpack_from('<HH',d,0x3A);print(sh_off+sh_sz*sh_n)" Proton_Pass-X-x86_64.AppImage)
 
-# 1. Runtime is the signed upstream one
-head -c "$OFFSET" Proton_Pass-X-x86_64.AppImage > runtime
-#    (compare its sha256 with the release notes; note the embedded update info
-#     changes the bytes vs. the raw upstream download)
-
-# 2. Payload matches Proton's .deb
+# 1. Payload matches Proton's .deb
 dpkg-deb -x proton-pass_X_amd64.deb deb
 unsquashfs -o "$OFFSET" -d appimg Proton_Pass-X-x86_64.AppImage
 diff -r deb/usr/lib appimg/usr/lib
 diff -r deb/usr/share appimg/usr/share   # only additions: metainfo/ and applications/io.github.eccl3s.ProtonPass.desktop
 
-# 3. Read the added files
+# 2. Read the added files
 cat appimg/AppRun appimg/*.desktop appimg/usr/share/metainfo/*.xml
 ```
 
@@ -90,3 +101,14 @@ cat appimg/AppRun appimg/*.desktop appimg/usr/share/metainfo/*.xml
 - **appimagetool:** change `APPIMAGETOOL_VERSION` and `APPIMAGETOOL_SHA256` in `build.sh`.
 - **Runtime signing key:** if the AppImage project rotates its key, replace
   `keys/type2-runtime.asc` and `RUNTIME_KEY_FPR` (check the new fingerprint upstream).
+
+## License
+
+The packaging scripts in this repository are released under the [MIT License](LICENSE).
+
+Proton Pass itself is licensed by Proton AG under the
+[GNU GPL v3.0](https://github.com/ProtonMail/WebClients/blob/main/LICENSE); its source
+code is available at [ProtonMail/WebClients](https://github.com/ProtonMail/WebClients)
+(`applications/pass-desktop`), and each release links the exact source tag. Bundled
+Electron/Chromium components carry their own licenses (see `usr/lib/proton-pass/LICENSES.chromium.html`
+inside the AppImage).

@@ -103,7 +103,7 @@ rm -f "$ROOT/dist/$NAME" "$ROOT/dist/$NAME.zsync"
 (
   cd "$ROOT/dist"
   ARCH=x86_64 VERSION="$VERSION" APPIMAGE_EXTRACT_AND_RUN=1 \
-    "$TOOL" --runtime-file "$RUNTIME" -u "$UPDATE_INFO" "$APPDIR" "$NAME"
+    "$TOOL" --runtime-file "$RUNTIME" --comp zstd -u "$UPDATE_INFO" "$APPDIR" "$NAME"
   sha256sum "$NAME" > "$NAME.sha256"
 )
 
