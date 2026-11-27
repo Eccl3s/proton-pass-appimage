@@ -107,14 +107,12 @@ rm -f "$ROOT/dist/$NAME" "$ROOT/dist/$NAME.zsync"
   sha256sum "$NAME" > "$NAME.sha256"
 )
 
-cat > "$ROOT/dist/build-info.txt" <<EOF
-version=$VERSION
-deb_url=$DEB_URL
-deb_sha512=$DEB_SHA512
-runtime_sha256=$RUNTIME_SHA256
-appimagetool_version=$APPIMAGETOOL_VERSION
-update_info=$UPDATE_INFO
-EOF
+# Shell-quoted so the workflow can source it safely
+for kv in "version=$VERSION" "deb_url=$DEB_URL" "deb_sha512=$DEB_SHA512" \
+          "runtime_sha256=$RUNTIME_SHA256" "appimagetool_version=$APPIMAGETOOL_VERSION" \
+          "update_info=$UPDATE_INFO"; do
+  printf '%s=%q\n' "${kv%%=*}" "${kv#*=}"
+done > "$ROOT/dist/build-info.txt"
 
 echo "==> Built dist/$NAME"
 cat "$ROOT/dist/$NAME.sha256"
