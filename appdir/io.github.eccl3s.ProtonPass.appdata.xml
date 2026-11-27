@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.eccl3s.ProtonPass</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <name>Proton Pass</name>
+  <summary>Open-source and end-to-end encrypted password manager</summary>
+  <developer id="me.proton">
+    <name>Proton AG</name>
+  </developer>
+  <description>
+    <p>
+      Proton Pass is an end-to-end encrypted password manager with support for
+      logins, passkeys, credit cards, notes, aliases and two-factor codes.
+    </p>
+    <p>
+      This is an unofficial AppImage, repackaged unmodified from Proton's
+      official Debian package. It is not affiliated with Proton AG.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.eccl3s.ProtonPass.desktop</launchable>
+  <url type="homepage">https://proton.me/pass</url>
+  <url type="vcs-browser">https://github.com/ProtonMail/WebClients</url>
+  <categories>
+    <category>Utility</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="@VERSION@" date="@DATE@"/>
+  </releases>
+</component>

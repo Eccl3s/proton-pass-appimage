@@ -10,15 +10,16 @@ on:
         required: false
         default: ""
       force:
-        description: "Rebuild even if a release already exists"
+        description: "Rebuild and replace assets even if the release exists"
         type: boolean
         default: false
+  pull_request:              # build-only check, never publishes
 
 permissions:
   contents: write
 
 concurrency:
-  group: build
+  group: build-${{ github.event_name == 'pull_request' && github.ref || 'release' }}
   cancel-in-progress: false
 
 jobs:
@@ -33,6 +34,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           INPUT_VERSION: ${{ inputs.version }}
           INPUT_FORCE: ${{ inputs.force }}
+          EVENT: ${{ github.event_name }}
         run: |
           set -euo pipefail
           if [ -n "${INPUT_VERSION:-}" ]; then
@@ -43,7 +45,9 @@ jobs:
               | sort -V | tail -n1)"
           fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
-          if gh release view "v$V" >/dev/null 2>&1 && [ "${INPUT_FORCE:-false}" != "true" ]; then
+          if [ "$EVENT" = "pull_request" ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          elif gh release view "v$V" >/dev/null 2>&1 && [ "${INPUT_FORCE:-false}" != "true" ]; then
             echo "Release v$V already exists; nothing to do."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
@@ -52,14 +56,35 @@ jobs:
 
       - name: Install build tools
         if: steps.ver.outputs.skip == 'false'
-        run: sudo apt-get update && sudo apt-get install -y squashfs-tools jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq gpg zsync appstream desktop-file-utils
 
       - name: Build AppImage
         if: steps.ver.outputs.skip == 'false'
         run: ./build.sh "${{ steps.ver.outputs.version }}"
 
-      - name: Publish release
+      - name: Check output
         if: steps.ver.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          ls -la dist
+          A=$(ls dist/*.AppImage)
+          test -s "$A.zsync"
+          # Embedded update information
+          ./"$A" --appimage-updateinformation 2>/dev/null || APPIMAGE_EXTRACT_AND_RUN=1 ./"$A" --appimage-updateinformation
+          echo
+
+      - name: Upload build artifact
+        if: steps.ver.outputs.skip == 'false' && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: appimage
+          path: dist/
+          retention-days: 7
+
+      - name: Publish release
+        if: steps.ver.outputs.skip == 'false' && github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
           V: ${{ steps.ver.outputs.version }}
@@ -71,13 +96,17 @@ jobs:
 
           - Upstream .deb: $deb_url
           - Upstream SHA-512 (verified at build time): \`$deb_sha512\`
+          - AppImage runtime SHA-256 (GPG signature verified): \`$runtime_sha256\`
+          - Built with appimagetool $appimagetool_version
           - AppImage SHA-256: \`$(cut -d' ' -f1 dist/*.AppImage.sha256)\`
 
           Unofficial build, not affiliated with Proton AG. See the README for how to verify it.
           EOF
+          ASSETS=(dist/*.AppImage dist/*.AppImage.zsync dist/*.AppImage.sha256)
           if gh release view "v$V" >/dev/null 2>&1; then
-            gh release upload "v$V" dist/*.AppImage dist/*.sha256 --clobber
+            gh release upload "v$V" "${ASSETS[@]}" --clobber
+            gh release edit "v$V" --notes-file notes.md
           else
-            gh release create "v$V" dist/*.AppImage dist/*.sha256 \
+            gh release create "v$V" "${ASSETS[@]}" \
               --title "Proton Pass $V" --notes-file notes.md --latest
           fi
