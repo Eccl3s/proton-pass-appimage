@@ -1,0 +1,12 @@
+#!/bin/sh
+# AppRun for Proton Pass
+HERE="$(dirname "$(readlink -f "$0")")"
+BIN="$HERE/usr/lib/proton-pass/Proton Pass"
+EXTRA=""
+# AppImages cannot carry a setuid chrome-sandbox. Chromium uses the
+# user-namespace sandbox when the kernel permits it; otherwise disable it.
+if ! unshare --user --map-root-user true >/dev/null 2>&1; then
+  echo "proton-pass: unprivileged user namespaces unavailable; running with --no-sandbox" >&2
+  EXTRA="--no-sandbox"
+fi
+exec "$BIN" $EXTRA "$@"

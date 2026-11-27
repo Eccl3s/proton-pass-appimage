@@ -1,0 +1,83 @@
+name: Build Proton Pass AppImage
+
+on:
+  schedule:
+    - cron: "23 */6 * * *"   # every 6 hours
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Proton Pass version to build (blank = latest stable)"
+        required: false
+        default: ""
+      force:
+        description: "Rebuild even if a release already exists"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine version
+        id: ver
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_VERSION:-}" ]; then
+            V="$INPUT_VERSION"
+          else
+            V="$(curl -fsSL https://proton.me/download/PassDesktop/linux/x64/version.json \
+              | jq -r '[.Releases[] | select(.CategoryName == "Stable") | .Version] | .[]' \
+              | sort -V | tail -n1)"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if gh release view "v$V" >/dev/null 2>&1 && [ "${INPUT_FORCE:-false}" != "true" ]; then
+            echo "Release v$V already exists; nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install build tools
+        if: steps.ver.outputs.skip == 'false'
+        run: sudo apt-get update && sudo apt-get install -y squashfs-tools jq
+
+      - name: Build AppImage
+        if: steps.ver.outputs.skip == 'false'
+        run: ./build.sh "${{ steps.ver.outputs.version }}"
+
+      - name: Publish release
+        if: steps.ver.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          . dist/build-info.txt
+          cat > notes.md <<EOF
+          Proton Pass **$V**, repackaged as an AppImage from Proton's official .deb.
+
+          - Upstream .deb: $deb_url
+          - Upstream SHA-512 (verified at build time): \`$deb_sha512\`
+          - AppImage SHA-256: \`$(cut -d' ' -f1 dist/*.AppImage.sha256)\`
+
+          Unofficial build, not affiliated with Proton AG. See the README for how to verify it.
+          EOF
+          if gh release view "v$V" >/dev/null 2>&1; then
+            gh release upload "v$V" dist/*.AppImage dist/*.sha256 --clobber
+          else
+            gh release create "v$V" dist/*.AppImage dist/*.sha256 \
+              --title "Proton Pass $V" --notes-file notes.md --latest
+          fi
